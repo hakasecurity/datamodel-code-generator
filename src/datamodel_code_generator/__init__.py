@@ -291,7 +291,6 @@ def generate(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915
     formatters: list[Formatter] = DEFAULT_FORMATTERS,
     parent_scoped_naming: bool = False,
     disable_future_imports: bool = False,
-    scalars_from_import: str | None = None,
 ) -> None:
     remote_text_cache: DefaultPutDict[str, str] = DefaultPutDict()
     if isinstance(input_, str):
@@ -340,7 +339,6 @@ def generate(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915
         if output_model_type == DataModelType.StrawberryEnum:
             from datamodel_code_generator.parser.strawberry_graphql import StrawberryGraphQLParser  # noqa: PLC0415
             parser_class: type[Parser] = StrawberryGraphQLParser
-            kwargs["scalars_from_import"] = scalars_from_import
         else:
             from datamodel_code_generator.parser.graphql import GraphQLParser  # noqa: PLC0415
             parser_class: type[Parser] = GraphQLParser

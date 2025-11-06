@@ -72,7 +72,6 @@ def test_graphql_enum_generation():
 
 
 def test_graphql_custom_scalars():
-    """Test that custom scalars are imported only when --scalars-from-import is provided."""
     graphql_schema = """
     scalar Email
     scalar MD5
@@ -83,17 +82,10 @@ def test_graphql_custom_scalars():
     }
     """
     
-    result = generate_strawberry_code(graphql_schema)
+    result = generate_strawberry_code(graphql_schema, additional_imports=[".custom_types.scalars.*", ".custom_types.enums.*"])
     if write_expected:
         write_expected_file("custom_scalars.py", result)
     expected = (EXPECTED_DIR / "custom_scalars.py").read_text()
-    assert result == expected
-        
-    # Test with custom import path
-    result = generate_strawberry_code(graphql_schema, scalars_from_import=".custom.scalars")
-    if write_expected:
-        write_expected_file("custom_scalars_with_import.py", result)
-    expected = (EXPECTED_DIR / "custom_scalars_with_import.py").read_text()
     assert result == expected
 
 

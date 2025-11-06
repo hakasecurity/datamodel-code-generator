@@ -6,6 +6,9 @@ from __future__ import annotations
 import strawberry
 from strawberry.scalars import *
 
+from .custom_types.enums import *
+from .custom_types.scalars import *
+
 
 @strawberry.type
 class Test:

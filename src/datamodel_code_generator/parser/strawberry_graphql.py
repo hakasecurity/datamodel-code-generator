@@ -124,7 +124,6 @@ class StrawberryGraphQLParser(GraphQLParser):
         no_alias: bool = False,
         formatters: list[Formatter] = DEFAULT_FORMATTERS,
         parent_scoped_naming: bool = False,
-        scalars_from_import: str | None = None,
     ) -> None:
         super().__init__(
             source=source,
@@ -205,7 +204,6 @@ class StrawberryGraphQLParser(GraphQLParser):
             formatters=formatters,
             parent_scoped_naming=parent_scoped_naming,
         )
-        self.custom_scalar_import_from = scalars_from_import
 
     def parse_enum(self, enum_object: graphql.GraphQLEnumType) -> None:
         """Parse GraphQL enum to Strawberry enum."""
@@ -555,15 +553,6 @@ class StrawberryGraphQLParser(GraphQLParser):
                         name=type_name,
                         original_name=type_name,
                     )
-        
-        # Add import for custom scalars (only if scalars_from_import is provided)
-        if custom_scalars and self.custom_scalar_import_from:
-            from datamodel_code_generator.imports import Import
-            # Sort scalars for consistent output
-            sorted_scalars = sorted(custom_scalars)
-            for scalar_name in sorted_scalars:
-                scalar_import = Import(import_=scalar_name, from_=self.custom_scalar_import_from)
-                self.imports.append(scalar_import)
         
         # Handle directives
         for directive in schema.directives:
