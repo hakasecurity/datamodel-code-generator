@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 import strawberry
 from strawberry import ID
@@ -30,4 +29,4 @@ class User:
 class CreateUserInput:
     email: str
     name: str
-    status: Optional[UserStatus] = UserStatus.ACTIVE
+    status: UserStatus | None = UserStatus.ACTIVE

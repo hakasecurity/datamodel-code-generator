@@ -17,6 +17,11 @@ class Status(Enum):
 
 
 @strawberry.schema_directive(locations=[Location.FIELD_DEFINITION])
+class Beta:
+    pass
+
+
+@strawberry.schema_directive(locations=[Location.FIELD_DEFINITION])
 class Config:
     disabled: Optional[bool] = False
     enabled: Optional[bool] = True
@@ -24,6 +29,17 @@ class Config:
     maxInt: Optional[int] = 100
     message: Optional[str] = 'Hello'
     minInt: Optional[int] = 0
+    name: Optional[str]
     optionalInt: Optional[int] = 42
     optionalString: Optional[str] = 'default'
+    required: bool
+    required_with_default: Optional[bool] = True
     status: Optional[Status] = Status.ACTIVE
+
+
+@strawberry.schema_directive(
+    locations=[Location.FIELD_DEFINITION, Location.INPUT_FIELD_DEFINITION]
+)
+class Foo:
+    bar: Optional[bool]
+    name: Optional[str]

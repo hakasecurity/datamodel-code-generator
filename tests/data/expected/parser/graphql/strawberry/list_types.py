@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 import strawberry
 from strawberry import ID
@@ -13,5 +13,5 @@ from strawberry.scalars import *
 @strawberry.type
 class User:
     id: ID
-    optionalTags: Optional[List[Optional[str]]]
+    optionalTags: List[str] | None
     tags: List[str]

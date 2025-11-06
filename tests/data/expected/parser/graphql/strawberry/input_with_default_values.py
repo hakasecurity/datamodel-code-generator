@@ -17,7 +17,7 @@ class Direction(Enum):
 
 @strawberry.input
 class PagingInput:
-    from_: int = strawberry.field(name='from', default=0)
+    from_: int | None = strawberry.field(name='from', default=0)
     limit: int = 100
 
 

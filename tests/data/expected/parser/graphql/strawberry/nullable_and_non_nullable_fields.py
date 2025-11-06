@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from strawberry import ID
 from strawberry.scalars import *
@@ -12,7 +10,7 @@ from strawberry.scalars import *
 
 @strawberry.type
 class User:
-    age: Optional[int]
-    email: Optional[str]
+    age: int | None
+    email: str | None
     id: ID
     name: str
