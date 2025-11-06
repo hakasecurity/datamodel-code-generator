@@ -162,7 +162,9 @@ def test_graphql_directive_generation():
     }
 
     directive @config(
-        ## should be initialized to None, but doesn't work
+        ## Known issue:
+        ## 1. non-nullable arguments are generated with Optional wrapper
+        ## 2. arguments without default are not initialized to None
         name: String
         required: Boolean!
         required_with_default: Boolean! = true
