@@ -24,7 +24,7 @@ def generate_strawberry_code(graphql_schema: str, **kwargs):
         generate(
             graphql_schema,
             input_file_type=InputFileType.GraphQL,
-            output_model_type=DataModelType.StrawberryEnum,
+            output_model_type=DataModelType.Strawberry,
             output=output_path,
             disable_timestamp=True,
             use_union_operator=True,

@@ -171,7 +171,7 @@ class DataModelType(Enum):
     DataclassesDataclass = "dataclasses.dataclass"
     TypingTypedDict = "typing.TypedDict"
     MsgspecStruct = "msgspec.Struct"
-    StrawberryEnum = "strawberry.Enum"
+    Strawberry = "strawberry"
 
 
 class OpenAPIScope(Enum):
@@ -336,7 +336,7 @@ def generate(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915
         kwargs["openapi_scopes"] = openapi_scopes
         kwargs["include_path_parameters"] = include_path_parameters
     elif input_file_type == InputFileType.GraphQL:
-        if output_model_type == DataModelType.StrawberryEnum:
+        if output_model_type == DataModelType.Strawberry:
             from datamodel_code_generator.parser.strawberry_graphql import StrawberryGraphQLParser  # noqa: PLC0415
             parser_class: type[Parser] = StrawberryGraphQLParser
         else:

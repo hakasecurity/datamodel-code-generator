@@ -79,7 +79,7 @@ def get_data_model_types(
             dump_resolve_reference_action=None,
             known_third_party=["msgspec"],
         )
-    if data_model_type == DataModelType.StrawberryEnum:
+    if data_model_type == DataModelType.Strawberry:
         return DataModelSet(
             data_model=strawberry.BaseModel,
             root_model=strawberry.RootModel,
