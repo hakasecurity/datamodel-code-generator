@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 import strawberry
 from strawberry.schema_directives import Location
@@ -23,23 +22,23 @@ class Beta:
 
 @strawberry.schema_directive(locations=[Location.FIELD_DEFINITION])
 class Config:
-    disabled: Optional[bool] = False
-    enabled: Optional[bool] = True
-    maxFloat: Optional[float] = 3.14
-    maxInt: Optional[int] = 100
-    message: Optional[str] = 'Hello'
-    minInt: Optional[int] = 0
-    name: Optional[str]
-    optionalInt: Optional[int] = 42
-    optionalString: Optional[str] = 'default'
+    disabled: bool = False
+    enabled: bool = True
+    maxFloat: float = 3.14
+    maxInt: int = 100
+    message: str = 'Hello'
+    minInt: int = 0
+    name: str | None = None
+    optionalInt: int | None = 42
+    optionalString: str | None = 'default'
     required: bool
-    required_with_default: Optional[bool] = True
-    status: Optional[Status] = Status.ACTIVE
+    required_with_default: bool = True
+    status: Status = Status.ACTIVE
 
 
 @strawberry.schema_directive(
     locations=[Location.FIELD_DEFINITION, Location.INPUT_FIELD_DEFINITION]
 )
 class Foo:
-    bar: Optional[bool]
-    name: Optional[str]
+    bar: bool | None = None
+    name: str | None = None

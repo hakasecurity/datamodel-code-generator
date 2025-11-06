@@ -24,21 +24,25 @@ class {{ class_name }}{% if base_class %}({{ base_class }}){% endif %}:{% if com
     {%- else %}
     {{ field.name }}: {{ field.type_hint }}
     {%- endif %}
-    {%- if field.represented_default and field.represented_default != 'None' and not (field.required or field.strip_default_none)
+    {%- if field.represented_default and not (field.required or field.strip_default_none)
             -%}
             {%- set default_str = field.represented_default -%}
-            {%- set scalar_names = ['ID', 'String', 'Int', 'Float', 'Boolean'] -%}
-            {%- set is_quoted_scalar = (default_str.startswith("'") and default_str.endswith("'") and default_str[1:-1] in scalar_names) or (default_str.startswith('"') and default_str.endswith('"') and default_str[1:-1] in scalar_names) -%}
-            {%- set is_quoted_enum_member = (default_str.startswith("'") and default_str.endswith("'") and '.' in default_str[1:-1]) or (default_str.startswith('"') and default_str.endswith('"') and '.' in default_str[1:-1]) -%}
-            {%- if (default_str.startswith("'strawberry.scalars.") and default_str.endswith("'")) or (default_str.startswith('"strawberry.scalars.') and default_str.endswith('"'))
-                -%}
-                = {{ default_str[1:-1] }}
-            {%- elif is_quoted_scalar -%}
-                = {{ default_str[1:-1] }}
-            {%- elif is_quoted_enum_member -%}
-                = {{ default_str[1:-1] }}
+            {%- if default_str == 'None' -%}
+                = None
             {%- else -%}
-                = {{ field.represented_default }}
+                {%- set scalar_names = ['ID', 'String', 'Int', 'Float', 'Boolean'] -%}
+                {%- set is_quoted_scalar = (default_str.startswith("'") and default_str.endswith("'") and default_str[1:-1] in scalar_names) or (default_str.startswith('"') and default_str.endswith('"') and default_str[1:-1] in scalar_names) -%}
+                {%- set is_quoted_enum_member = (default_str.startswith("'") and default_str.endswith("'") and '.' in default_str[1:-1]) or (default_str.startswith('"') and default_str.endswith('"') and '.' in default_str[1:-1]) -%}
+                {%- if (default_str.startswith("'strawberry.scalars.") and default_str.endswith("'")) or (default_str.startswith('"strawberry.scalars.') and default_str.endswith('"'))
+                    -%}
+                    = {{ default_str[1:-1] }}
+                {%- elif is_quoted_scalar -%}
+                    = {{ default_str[1:-1] }}
+                {%- elif is_quoted_enum_member -%}
+                    = {{ default_str[1:-1] }}
+                {%- else -%}
+                    = {{ field.represented_default }}
+                {%- endif -%}
             {%- endif -%}
     {%- endif -%}
     {%- endif %}

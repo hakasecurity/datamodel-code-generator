@@ -646,16 +646,25 @@ class StrawberryGraphQLParser(GraphQLParser):
                             strawberry_model.imports.IMPORT_STRAWBERRY_ID,
                             is_optional=not is_non_null,
                         )
+                        data_type.use_union_operator = self.use_union_operator
+                        data_type.use_standard_collections = self.use_standard_collections
                     else:
                         data_type = DataType(
                             type=graphql_to_python[type_name],
                             is_optional=not is_non_null,
+                            use_union_operator=self.use_union_operator,
+                            use_standard_collections=self.use_standard_collections,
                         )
                 else:
                     data_type = DataType(
                         type=type_name,
                         is_optional=not is_non_null,
+                        use_union_operator=self.use_union_operator,
+                        use_standard_collections=self.use_standard_collections,
                     )
+                    # Set reference for enum types
+                    if graphql.is_enum_type(arg_type):
+                        data_type.reference = self.references[type_name]
 
             # Check if argument has a default value
             # GraphQL uses Undefined sentinel object for arguments without defaults
@@ -710,16 +719,24 @@ class StrawberryGraphQLParser(GraphQLParser):
             # Required is True if non-null AND no default value
             required = is_non_null and default is None
             
-            # Only pass default if there's an actual default value
+            # For nullable fields without explicit default, set default to None
+            has_default = default is not None
+            if not is_non_null and default is None:
+                default = None
+                has_default = True
+
+            # Build field kwargs
+            # Set nullable explicitly: nullable fields should have nullable=True, non-nullable should have nullable=False
+            # This ensures the type_hint property handles Optional wrapping correctly
             field_kwargs = {
                 'name': field_name,
                 'data_type': data_type,
                 'required': required,
                 'description': arg.description,
+                'nullable': not is_non_null,
             }
-            if default is not None:
+            if has_default:
                 field_kwargs['default'] = default
-                # Set has_default flag so the template knows to render the default
                 field_kwargs['has_default'] = True
             
             fields.append(
