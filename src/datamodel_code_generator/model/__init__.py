@@ -17,12 +17,27 @@ DEFAULT_TARGET_PYTHON_VERSION = PythonVersion(f"{sys.version_info.major}.{sys.ve
 
 
 class DataModelSet(NamedTuple):
+    """Container for model types used by a parser.
+
+    Added optional framework-specific model types (input_model, enum_model,
+    directive_model, scalar_model) to support framework-specific implementations.
+
+    This enables GraphQL-based frameworks like Strawberry to provide custom models
+    for different GraphQL constructs (types, inputs, enums, directives) while
+    reusing the generic GraphQLParser. The optional fields default to None for
+    non-GraphQL parsers (JsonSchema, OpenAPI) which don't need these distinctions.
+    """
     data_model: type[DataModel]
     root_model: type[DataModel]
     field_model: type[DataModelFieldBase]
     data_type_manager: type[DataTypeManagerABC]
     dump_resolve_reference_action: Callable[[Iterable[str]], str] | None
     known_third_party: list[str] | None = None
+    # framework-specific model types for framework-specific model implementations
+    input_model: type[DataModel] | None = None  # For GraphQL input objects
+    enum_model: type[DataModel] | None = None    # For GraphQL enums
+    directive_model: type[DataModel] | None = None  # For GraphQL directives
+    scalar_model: type[DataModel] | None = None  # For GraphQL scalars
 
 
 def get_data_model_types(
@@ -87,6 +102,10 @@ def get_data_model_types(
             data_type_manager=strawberry.DataTypeManager,
             dump_resolve_reference_action=None,
             known_third_party=["strawberry-graphql"],
+            input_model=strawberry.Input,
+            enum_model=strawberry.Enum,
+            directive_model=strawberry.Directive,
+            scalar_model=strawberry.DataTypeScalar,
         )
     msg = f"{data_model_type} is unsupported data model type"
     raise ValueError(msg)  # pragma: no cover

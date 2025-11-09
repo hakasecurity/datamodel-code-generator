@@ -31,11 +31,6 @@ class GroupMetadata(BaseModel):
     )
 
 
-class Resource(BaseModel):
-    metadata: UserMetadata
-    typename__: Optional[Literal['Resource']] = Field('Resource', alias='__typename')
-
-
 class UserMetadata(BaseModel):
     """
     This is a multiline comment,
@@ -63,3 +58,8 @@ Metadata: TypeAlias = Union[
     'GroupMetadata',
     'UserMetadata',
 ]
+
+
+class Resource(BaseModel):
+    metadata: UserMetadata
+    typename__: Optional[Literal['Resource']] = Field('Resource', alias='__typename')

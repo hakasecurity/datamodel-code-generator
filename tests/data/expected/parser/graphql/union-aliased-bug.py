@@ -27,11 +27,6 @@ class GroupMetadata(BaseModel):
     )
 
 
-class Resource(BaseModel):
-    metadata: UserMetadata
-    typename__: Optional[Literal['Resource']] = Field('Resource', alias='__typename')
-
-
 class UserMetadata(BaseModel):
     name: String
     typename__: Optional[Literal['UserMetadata']] = Field(
@@ -43,3 +38,8 @@ Metadata: TypeAlias = Union[
     'GroupMetadata',
     'UserMetadata',
 ]
+
+
+class Resource(BaseModel):
+    metadata: UserMetadata
+    typename__: Optional[Literal['Resource']] = Field('Resource', alias='__typename')

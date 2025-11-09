@@ -336,12 +336,9 @@ def generate(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915
         kwargs["openapi_scopes"] = openapi_scopes
         kwargs["include_path_parameters"] = include_path_parameters
     elif input_file_type == InputFileType.GraphQL:
-        if output_model_type == DataModelType.Strawberry:
-            from datamodel_code_generator.parser.strawberry_graphql import StrawberryGraphQLParser  # noqa: PLC0415
-            parser_class: type[Parser] = StrawberryGraphQLParser
-        else:
-            from datamodel_code_generator.parser.graphql import GraphQLParser  # noqa: PLC0415
-            parser_class: type[Parser] = GraphQLParser
+        from datamodel_code_generator.parser.graphql import GraphQLParser  # noqa: PLC0415
+
+        parser_class: type[Parser] = GraphQLParser
     else:
         from datamodel_code_generator.parser.jsonschema import JsonSchemaParser  # noqa: PLC0415
 
@@ -421,13 +418,36 @@ def generate(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915
     data_model_types = get_data_model_types(output_model_type, target_python_version)
     source = input_text or input_
     assert not isinstance(source, Mapping)
+
+    # Prepare parser kwargs with default parameters
+    # This approach allows the GraphQLParser to support framework-specific models (like Strawberry)
+    # without requiring a separate parser implementation for each framework.
+    parser_kwargs = {
+        "source": source,
+        "data_model_type": data_model_types.data_model,
+        "data_model_root_type": data_model_types.root_model,
+        "data_model_field_type": data_model_types.field_model,
+        "data_type_manager_type": data_model_types.data_type_manager,
+        "base_class": base_class,
+    }
+
+    # Conditionally override default parameters with framework-specific model types
+    # These optional parameters enable frameworks like Strawberry to provide custom
+    # implementations for inputs, enums, and directives while reusing the generic
+    # GraphQL parser
+    from datamodel_code_generator.parser.graphql import GraphQLParser  # noqa: PLC0415
+    if issubclass(parser_class, GraphQLParser):
+        if data_model_types.input_model is not None:
+            parser_kwargs["data_model_input_type"] = data_model_types.input_model
+        if data_model_types.enum_model is not None:
+            parser_kwargs["data_model_enum_type"] = data_model_types.enum_model
+        if data_model_types.directive_model is not None:
+            parser_kwargs["data_model_directive_type"] = data_model_types.directive_model
+        if data_model_types.scalar_model is not None:
+            parser_kwargs["data_model_scalar_type"] = data_model_types.scalar_model
+
     parser = parser_class(
-        source=source,
-        data_model_type=data_model_types.data_model,
-        data_model_root_type=data_model_types.root_model,
-        data_model_field_type=data_model_types.field_model,
-        data_type_manager_type=data_model_types.data_type_manager,
-        base_class=base_class,
+        **parser_kwargs,
         additional_imports=additional_imports,
         custom_template_dir=custom_template_dir,
         extra_template_data=extra_template_data,

@@ -17,6 +17,12 @@ def write_expected_file(expected_file: str, content: str):
 
 
 def generate_strawberry_code(graphql_schema: str, **kwargs):
+    """Generate Strawberry GraphQL code from a GraphQL schema.
+
+    Note: We use Python 3.10+ target to ensure union operators are used.
+    """
+    from datamodel_code_generator import PythonVersion
+
     with NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
         output_path = Path(f.name)
     
@@ -28,6 +34,7 @@ def generate_strawberry_code(graphql_schema: str, **kwargs):
             output=output_path,
             disable_timestamp=True,
             use_union_operator=True,
+            target_python_version=PythonVersion.PY_310,
             **kwargs,
         )
 
@@ -162,9 +169,6 @@ def test_graphql_directive_generation():
     }
 
     directive @config(
-        ## Known issue:
-        ## 1. non-nullable arguments are generated with Optional wrapper
-        ## 2. arguments without default are not initialized to None
         name: String
         required: Boolean!
         required_with_default: Boolean! = true

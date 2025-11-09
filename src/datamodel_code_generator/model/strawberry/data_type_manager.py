@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datamodel_code_generator.model.types import DataTypeManager as _DataTypeManager
+from datamodel_code_generator.model.pydantic.types import DataTypeManager as PydanticDataTypeManager
 from datamodel_code_generator.model.strawberry.imports import IMPORT_STRAWBERRY_ID
 from datamodel_code_generator.types import DataType, Types
 
 
-class DataTypeManager(_DataTypeManager):
+class DataTypeManager(PydanticDataTypeManager):
     def get_data_type(self, types: Types, **kwargs: str | bool | None) -> DataType:
         if types == Types.uuid or (types == Types.string and (kwargs.get("format") == "uuid" or kwargs.get("format__") == "uuid")):
             return DataType.from_import(IMPORT_STRAWBERRY_ID)

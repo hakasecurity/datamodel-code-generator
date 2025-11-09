@@ -12,6 +12,9 @@ class {{ class_name }}{% if base_class %}({{ base_class }}){% endif %}:{% if com
     pass
 {%- endif %}
 {%- for field in fields -%}
+    {%- if field.name == 'typename__' %}
+        {#- Skip __typename field for Strawberry -#}
+    {%- else -%}
     {%- if not field.annotated and field.field %}
     {{ field.name }}: {{ field.type_hint }} = {{ field.field }}
     {%- else %}
@@ -43,6 +46,7 @@ class {{ class_name }}{% if base_class %}({{ base_class }}){% endif %}:{% if com
     {{ field.docstring | indent(4) }}
     """
     {%- endif %}
+    {%- endif -%}
 {%- for method in methods -%}
     {{ method }}
 {%- endfor -%}

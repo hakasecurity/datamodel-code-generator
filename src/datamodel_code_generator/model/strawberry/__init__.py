@@ -7,6 +7,7 @@ from .directive import Directive
 from .root_model import RootModel
 from .data_model_field import DataModelField
 from .data_type_manager import DataTypeManager
+from .scalar import DataTypeScalar
 
 __all__ = [
     "BaseModel",
@@ -16,4 +17,5 @@ __all__ = [
     "RootModel",
     "DataModelField",
     "DataTypeManager",
+    "DataTypeScalar",
 ]
