@@ -323,3 +323,20 @@ class DataTypeManager(_DataTypeManager):
             return self.strict_type_map[StrictTypes.bool]
 
         return self.type_map[types]
+
+    def get_data_type_from_full_path(self, full_path: str, is_custom_type: bool = False) -> DataType:
+        # Handle GraphQL built-in scalar types by mapping them to Python types
+        # These will be resolved inline in field type hints
+        graphql_scalar_map = {
+            "String": "str",
+            "Int": "int",
+            "Float": "float",
+            "Boolean": "bool",
+            "ID": "str",  # GraphQL ID is typically a string in Pydantic
+        }
+
+        if full_path in graphql_scalar_map:
+            return DataType(type=graphql_scalar_map[full_path])
+
+        # For other types, use the default behavior
+        return super().get_data_type_from_full_path(full_path, is_custom_type)

@@ -52,7 +52,7 @@ optional-dependencies.debug = [
   "pysnooper>=0.4.1,<2",
 ]
 optional-dependencies.graphql = [
-  "graphql-core>=3.2.3",
+  "graphql-core>=3.2.3,<3.2.7",
 ]
 optional-dependencies.http = [
   "httpx>=0.24.1",
@@ -193,6 +193,13 @@ filterwarnings = [
 ]
 norecursedirs = "tests/data/*"
 verbosity_assertions = 2
+
+[[tool.uv.index]]
+name = "cato-jfrog"
+url = "https://catonetworks.jfrog.io/artifactory/api/pypi/cato-python"
+publish-url = "https://catonetworks.jfrog.io/artifactory/api/pypi/cato-python"
+explicit = true
+
 
 [tool.coverage]
 html.skip_covered = false

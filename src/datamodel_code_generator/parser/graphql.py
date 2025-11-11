@@ -86,6 +86,12 @@ class GraphQLParser(Parser):
         data_model_root_type: type[DataModel] = pydantic_model.CustomRootType,
         data_model_scalar_type: type[DataModel] = DataTypeScalar,
         data_model_union_type: type[DataModel] = DataTypeUnion,
+        # Add support for different model types per GraphQL construct
+        # to allow frameworks like Strawberry to use the generic GraphQL parser
+        # while providing their own model implementations without requiring a separate parser
+        data_model_input_type: type[DataModel] | None = None,  # For GraphQL input types
+        data_model_enum_type: type[DataModel] | None = None,  # For GraphQL enum types
+        data_model_directive_type: type[DataModel] | None = None,  # For GraphQL directives
         data_type_manager_type: type[DataTypeManager] = pydantic_model.DataTypeManager,
         data_model_field_type: type[DataModelFieldBase] = pydantic_model.DataModelField,
         base_class: str | None = None,
@@ -239,6 +245,12 @@ class GraphQLParser(Parser):
 
         self.data_model_scalar_type = data_model_scalar_type
         self.data_model_union_type = data_model_union_type
+        # Store model types with fallbacks to support both Pydantic and Strawberry
+        # If specific types aren't provided, fall back to the generic data_model_type
+        # This enables reusing the same parser for different frameworks
+        self.data_model_input_type = data_model_input_type or data_model_type
+        self.data_model_enum_type = data_model_enum_type or Enum
+        self.data_model_directive_type = data_model_directive_type  # No fallback - directives are optional
         self.use_standard_collections = use_standard_collections
         self.use_union_operator = use_union_operator
 
@@ -268,6 +280,16 @@ class GraphQLParser(Parser):
                 yield source, path_parts
 
     def _resolve_types(self, paths: list[str], schema: graphql.GraphQLSchema) -> None:
+        """Resolve and register GraphQL types for code generation.
+
+        Enhanced to handle built-in scalars as referenceable types.
+        Previously, built-in scalars were skipped entirely. Now they're registered
+        so that frameworks like Strawberry can map them to their own types
+        (e.g., GraphQL ID -> strawberry.ID) via templates.
+        """
+        # Built-in GraphQL scalar types
+        builtin_scalars = {"String", "Int", "Float", "Boolean", "ID"}
+
         for type_name, type_ in schema.type_map.items():
             if type_name.startswith("__"):
                 continue
@@ -276,6 +298,23 @@ class GraphQLParser(Parser):
                 continue
 
             resolved_type = graphql_resolver.kind(type_, None)
+
+            # For built-in scalars, add them to references so fields can reference them
+            # The actual rendering (as TypeAlias or native types) is handled by templates
+            if type_name in builtin_scalars:
+                if resolved_type == graphql.type.introspection.TypeKind.SCALAR:
+                    self.all_graphql_objects[type_.name] = type_
+                    self.references[type_.name] = Reference(
+                        path=f"{paths!s}/{resolved_type.value}/{type_.name}",
+                        name=type_.name,
+                        original_name=type_.name,
+                    )
+                    self.support_graphql_types[resolved_type].append(type_)
+                continue
+
+            # Skip custom scalar types (they should be provided via additional_imports)
+            if resolved_type == graphql.type.introspection.TypeKind.SCALAR:
+                continue
 
             if resolved_type in self.support_graphql_types:  # pragma: no cover
                 self.all_graphql_objects[type_.name] = type_
@@ -312,15 +351,35 @@ class GraphQLParser(Parser):
             has_default=True,
         )
 
-    def _get_default(  # noqa: PLR6301
+    def _get_default(
         self,
-        field: graphql.GraphQLField | graphql.GraphQLInputField,
+        field: graphql.GraphQLField | graphql.GraphQLInputField | graphql.GraphQLArgument,
         final_data_type: DataType,
         required: bool,  # noqa: FBT001
     ) -> Any:
-        if isinstance(field, graphql.GraphQLInputField):  # pragma: no cover
+        """Get the default value for a GraphQL field.
+
+        Extended to handle GraphQLArgument in addition to GraphQLInputField.
+        This is necessary for parsing directive arguments, which were not supported
+        in the original implementation. Directive support eliminates the need for
+        a separate parser for directives.
+        """
+        # Handle default values for input fields and directive arguments
+        if isinstance(field, (graphql.GraphQLInputField, graphql.GraphQLArgument)):  # pragma: no cover
             if field.default_value == graphql.pyutils.Undefined:  # pragma: no cover
                 return None
+            # Check if the field type is an enum
+            field_type = field.type
+            # Check for list wrapping
+            is_list_type = False
+            while graphql.is_wrapping_type(field_type):
+                if graphql.is_list_type(field_type):
+                    is_list_type = True
+                field_type = field_type.of_type
+            if graphql.is_enum_type(field_type):
+                # For enum defaults, just return the value name(s)
+                # The __set_default_enum_member method will convert to proper enum members
+                return field.default_value
             return field.default_value
         if required is False and final_data_type.is_list:
             return None
@@ -365,7 +424,7 @@ class GraphQLParser(Parser):
                 )
             )
 
-        enum = Enum(
+        enum = self.data_model_enum_type(
             reference=self.references[enum_object.name],
             fields=enum_fields,
             path=self.current_source_path,
@@ -378,8 +437,15 @@ class GraphQLParser(Parser):
         self,
         field_name: str,
         alias: str | None,
-        field: graphql.GraphQLField | graphql.GraphQLInputField,
+        field: graphql.GraphQLField | graphql.GraphQLInputField | graphql.GraphQLArgument,
     ) -> DataModelFieldBase:
+        """Parse a GraphQL field into a data model field.
+
+        Extended to handle GraphQLArgument for directive arguments.
+        Also enhanced to properly handle default values and nullable constraints
+        for non-null types with defaults (e.g., Boolean! = true should generate
+        `bool = True` not `bool | None = True`).
+        """
         final_data_type = DataType(
             is_optional=True,
             use_union_operator=self.use_union_operator,
@@ -411,15 +477,39 @@ class GraphQLParser(Parser):
             data_type.reference = self.references[obj.name]
 
         obj = graphql.assert_named_type(obj)
-        data_type.type = obj.name
 
-        required = (not self.force_optional_for_required_fields) and (not final_data_type.is_optional)
+        # Check if this is a type we have a reference for (including built-in scalars)
+        if obj.name in self.references:
+            data_type.reference = self.references[obj.name]
+        else:
+            # For types without references (custom scalars), use the type name directly
+            data_type.type = obj.name
+
+        # Check if field has a default value (for arguments and input fields)
+        has_default_value = (
+            isinstance(field, (graphql.GraphQLInputField, graphql.GraphQLArgument))
+            and field.default_value != graphql.pyutils.Undefined
+        )
+
+        # A field is required only if it's not optional and doesn't have a default value
+        required = (
+            (not self.force_optional_for_required_fields)
+            and (not final_data_type.is_optional)
+            and (not has_default_value)
+        )
 
         default = self._get_default(field, final_data_type, required)
         extras = {} if self.default_field_extras is None else self.default_field_extras.copy()
 
         if field.description is not None:  # pragma: no cover
             extras["description"] = field.description
+
+        # For fields with non-null types that have defaults, we need to set nullable=False
+        # explicitly to prevent the type from becoming optional (e.g. bool | None)
+        # even though required=False
+        nullable = None
+        if has_default_value and not final_data_type.is_optional:
+            nullable = False
 
         return self.data_model_field_type(
             name=field_name,
@@ -434,6 +524,7 @@ class GraphQLParser(Parser):
             use_default_kwarg=self.use_default_kwarg,
             original_name=field_name,
             has_default=default is not None,
+            nullable=nullable,
         )
 
     def parse_object_like(
@@ -452,6 +543,7 @@ class GraphQLParser(Parser):
             data_model_field_type = self.parse_field(field_name_, alias, field)
             fields.append(data_model_field_type)
 
+        # Always add __typename field for GraphQL types (templates can filter it out)
         fields.append(self._typename_field(obj.name))
 
         base_classes = []
@@ -479,7 +571,46 @@ class GraphQLParser(Parser):
         self.parse_object_like(graphql_object)
 
     def parse_input_object(self, input_graphql_object: graphql.GraphQLInputObjectType) -> None:
-        self.parse_object_like(input_graphql_object)  # pragma: no cover
+        """Parse a GraphQL input object type into a data model.
+
+        Overridden to explicitly use `self.data_model_input_type` instead
+        of reusing `parse_object_like`. This allows Strawberry to provide its own
+        Input implementation with the @strawberry.input decorator. Previously, this
+        just called parse_object_like which didn't distinguish between types and inputs.
+        """
+        # Parse fields using the same logic as parse_object
+        fields: list[DataModelFieldBase] = []
+        exclude_field_names: set[str] = set()
+
+        for field_name, field in input_graphql_object.fields.items():
+            alias_name = self.model_resolver.get_valid_field_name(
+                field_name, excludes=exclude_field_names
+            )
+            exclude_field_names.add(alias_name)
+
+            fields.append(
+                self.parse_field(
+                    field_name=alias_name,
+                    alias=field_name if alias_name != field_name else None,
+                    field=field,
+                )
+            )
+
+        # Always add __typename field for GraphQL types (templates can filter it out)
+        fields.append(self._typename_field(input_graphql_object.name))
+
+        # Use Input model type instead of regular BaseModel
+        data_model = self.data_model_input_type(
+            reference=self.references[input_graphql_object.name],
+            fields=fields,
+            custom_base_class=self.base_class,
+            custom_template_dir=self.custom_template_dir,
+            extra_template_data=self.extra_template_data,
+            path=self.current_source_path,
+            description=input_graphql_object.description,
+            treat_dot_as_module=self.treat_dot_as_module,
+        )
+        self.results.append(data_model)
 
     def parse_union(self, union_object: graphql.GraphQLUnionType) -> None:
         fields = [self.data_model_field_type(name=type_.name, data_type=DataType()) for type_ in union_object.types]
@@ -528,3 +659,79 @@ class GraphQLParser(Parser):
                 for obj in self.support_graphql_types[next_type]:
                     parser_ = mapper_from_graphql_type_to_parser_method[next_type]
                     parser_(obj)
+
+            # Parse directives if we have a directive model type
+            if self.data_model_directive_type:
+                self._parse_directives(schema)
+
+    def _parse_directives(self, schema: graphql.GraphQLSchema) -> None:
+        """Parse GraphQL directives and generate directive classes.
+
+        Added directive parsing support to the generic GraphQL parser.
+        This method is now called conditionally when `data_model_directive_type` is
+        provided, eliminating the need for a separate parser implementation.
+
+        Key features:
+        - Filters out built-in GraphQL directives (skip, include, deprecated, specifiedBy)
+        - Parses directive arguments as fields
+        - Converts directive locations to framework-specific location enums
+        - Uses unique paths to prevent directives from overwriting each other
+        """
+        # Built-in GraphQL directives that should not be generated
+        builtin_directives = {'skip', 'include', 'deprecated', 'specifiedBy'}
+
+        for directive in schema.directives:
+            directive_name = directive.name
+            if directive_name in builtin_directives:
+                continue
+
+            # Parse directive arguments as fields
+            fields: list[DataModelFieldBase] = []
+            exclude_field_names: set[str] = set()
+
+            for arg_name, arg in directive.args.items():
+                alias_name = self.model_resolver.get_valid_field_name(
+                    arg_name, excludes=exclude_field_names
+                )
+                exclude_field_names.add(alias_name)
+
+                fields.append(
+                    self.parse_field(
+                        field_name=alias_name,
+                        alias=arg_name if alias_name != arg_name else None,
+                        field=arg,
+                    )
+                )
+
+            # Convert directive locations to strawberry Location enums
+            locations = [loc.name for loc in directive.locations]
+
+            # Create reference for the directive
+            # Use directive name as part of path to ensure uniqueness
+            class_name = self.model_resolver.get_class_name(directive_name)
+
+            # Create a unique path for each directive by appending the directive name
+            # This prevents directives from overwriting each other in sort_data_models
+            base_path = str(self.current_source_path) if self.current_source_path else ""
+            directive_path = f"{base_path}#{directive_name}" if base_path else directive_name
+
+            reference = Reference(
+                name=class_name.name,  # Extract string name from ClassName object
+                path=directive_path,
+                original_name=directive_name,
+            )
+            self.references[directive_name] = reference
+
+            # Create directive model
+            directive_model = self.data_model_directive_type(
+                reference=reference,
+                fields=fields,
+                custom_base_class=self.base_class,
+                custom_template_dir=self.custom_template_dir,
+                extra_template_data=self.extra_template_data,
+                path=self.current_source_path,
+                description=directive.description,
+                treat_dot_as_module=self.treat_dot_as_module,
+                locations=locations,
+            )
+            self.results.append(directive_model)
